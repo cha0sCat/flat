@@ -34,7 +34,7 @@ uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss, void* 
 		int opcode = *ptr++;
 		int opsize;
 
-		if (opcode > tail || *ptr > *tail) {
+		if (opcode > tail || ptr > tail) {
 		    return mss;
         }
 
