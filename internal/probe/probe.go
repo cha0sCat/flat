@@ -230,11 +230,16 @@ func Run(ctx context.Context, iface netlink.Link) error {
 			return probe.Close()
 
 		case pkt := <-c:
+			log.Printf("Received packet: %+v", pkt)
 			packetAttrs, ok := packet.UnmarshalBinary(pkt)
 			if !ok {
 				log.Printf("Could not unmarshall packet: %+v", pkt)
 				continue
 			}
+
+			// got a lot of wrong packets
+			// 2024/04/30 01:03:08 Received packetAttrs: {SrcIP:8092:8820:4855:200:3000:ffff:a0a:2248 DstIP:ed9:1207:4855:200:3000:ffff:a0a:2025 SrcPort:14562 DstPort:7377 Protocol:6 TTL:64 Syn:false Ack:false TimeStamp:656718712818379}
+			log.Printf("Received packetAttrs: %+v", packetAttrs)
 			packet.CalcLatency(packetAttrs, flowtable)
 		}
 	}
