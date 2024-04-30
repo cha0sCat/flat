@@ -24,7 +24,7 @@
 #define TCPOPT_MSS		2	/* Segment size negotiating */
 #define TCPOLEN_MSS            4
 
-uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss)
+uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss, void* tail)
 {
 	const unsigned char *ptr = (const unsigned char *)(th + 1);
 	int length = (th->doff * 4) - sizeof(struct tcphdr);
@@ -33,6 +33,10 @@ uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss)
 	while (length > 0) {
 		int opcode = *ptr++;
 		int opsize;
+
+		if (opcode > tail || *ptr > tail) {
+		    return mss;
+        }
 
 		switch (opcode) {
 		case TCPOPT_EOL:
@@ -193,7 +197,7 @@ static inline int try_handle_ip_option(void* head, void* tail, uint32_t* offset,
         return 0;
     }
 
-    pkt->mss = tcp_parse_mss_option(tcp, 0);
+    pkt->mss = tcp_parse_mss_option(tcp, 0, tail);
     return 1;
 }
 
