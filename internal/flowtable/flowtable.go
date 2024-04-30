@@ -20,18 +20,19 @@ func NewFlowTable() *FlowTable {
 }
 
 // Insert adds packet hash and its timestamp to the FlowTable
-func (table *FlowTable) Insert(hash, timestamp uint64) {
-	table.Store(hash, timestamp)
+func (table *FlowTable) Insert(hash, timestamp uint64, mss uint16) {
+	table.Store(hash, []uint64{timestamp, uint64(mss)})
 }
 
 // Get loads packet hash and its timestamp from the FlowTable
-func (table *FlowTable) Get(hash uint64) (uint64, bool) {
+func (table *FlowTable) Get(hash uint64) (uint64, uint16, bool) {
 	value, ok := table.Load(hash)
 
 	if !ok {
-		return 0, ok
+		return 0, 0, ok
 	}
-	return value.(uint64), true
+
+	return value.([]uint64)[0], uint16(value.([]uint64)[1]), ok
 }
 
 // Remove deletes packet hash and its timestamp from the FlowTable

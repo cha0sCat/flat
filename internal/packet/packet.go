@@ -26,6 +26,7 @@ type Packet struct {
 	Syn       bool
 	Ack       bool
 	TimeStamp uint64
+	MSS       uint16
 }
 
 func hash(value []byte) uint64 {
@@ -78,6 +79,7 @@ func UnmarshalBinary(in []byte) (Packet, bool) {
 		Syn:       in[38] == 1,
 		Ack:       in[39] == 1,
 		TimeStamp: binary.LittleEndian.Uint64(in[40:48]),
+		MSS:       binary.BigEndian.Uint16(in[48:50]),
 	}, true
 }
 
@@ -97,20 +99,20 @@ func CalcLatency(pkt Packet, table *flowtable.FlowTable) {
 
 	pktHash := pkt.Hash()
 
-	ts, ok := table.Get(pktHash)
+	ts, mss, ok := table.Get(pktHash)
 
 	if !ok && pkt.Syn {
-		table.Insert(pktHash, pkt.TimeStamp)
+		table.Insert(pktHash, pkt.TimeStamp, pkt.MSS)
 		return
 	} else if !ok && proto == "UDP" {
-		table.Insert(pktHash, pkt.TimeStamp)
+		table.Insert(pktHash, pkt.TimeStamp, 0)
 		return
 	} else if !ok {
 		return
 	}
 
 	if pkt.Ack {
-		colorCyan("(%v) | src: %v:%-7v\tdst: %v:%-9v\tTTL: %-4v\tlatency: %.3f ms\n",
+		colorCyan("(%v) | src: %v:%-7v\tdst: %v:%-9v\tTTL: %-4v\tlatency: %.3f ms\tSYN.MSS: %v\tACK.MSS: %v\n",
 			proto,
 			pkt.DstIP.Unmap().String(),
 			pkt.DstPort,
@@ -118,6 +120,8 @@ func CalcLatency(pkt Packet, table *flowtable.FlowTable) {
 			pkt.SrcPort,
 			pkt.TTL,
 			(float64(pkt.TimeStamp)-float64(ts))/1_000_000,
+			mss,
+			pkt.MSS,
 		)
 		table.Remove(pktHash)
 	} else if proto == "UDP" {

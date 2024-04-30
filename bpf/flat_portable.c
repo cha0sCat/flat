@@ -28,8 +28,27 @@ struct packet_t {
     bool syn;
     bool ack;
     uint64_t ts;
+    uint16_t mss; // New field for storing the TCP MSS
 };
 
+static inline uint16_t get_tcp_mss(void* tcp, uint32_t tcp_len) {
+    uint8_t* options = (uint8_t*)tcp + sizeof(struct tcphdr);
+    uint32_t offset = 0;
+    while (offset < tcp_len) {
+        uint8_t kind = options[offset];
+        if (kind == 0) {
+            break; // End of TCP options
+        } else if (kind == 1) {
+            offset++; // No-op
+        } else if (kind == 2) { // MSS
+            if (offset + 4 <= tcp_len) {
+                return bpf_ntohs(*(uint16_t*)(options + offset + 2));
+            }
+        }
+        offset += options[offset + 1];
+    }
+    return 0; // Return 0 if no MSS is found
+}
 
 static inline int handle_ip_packet(void* head, void* tail, uint32_t* offset, struct packet_t* pkt) {
     struct ethhdr* eth = head;
@@ -107,6 +126,9 @@ static inline int handle_ip_segment(void* head, void* tail, uint32_t* offset, st
             pkt->syn = tcp->syn;
             pkt->ack = tcp->ack;
             pkt->ts = bpf_ktime_get_ns();
+
+            uint32_t tcp_len = (tcp->doff - 5) * 4; // Length of TCP options
+            pkt->mss = get_tcp_mss((void*)tcp, tcp_len); // Get MSS from TCP options
 
             return 1;
         }

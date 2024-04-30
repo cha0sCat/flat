@@ -18,6 +18,53 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 
+
+#define TCPOPT_NOP		1	/* Padding */
+#define TCPOPT_EOL		0	/* End of options */
+#define TCPOPT_MSS		2	/* Segment size negotiating */
+#define TCPOLEN_MSS            4
+
+uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss)
+{
+	const unsigned char *ptr = (const unsigned char *)(th + 1);
+	int length = (th->doff * 4) - sizeof(struct tcphdr);
+	uint16_t mss = 0;
+
+	while (length > 0) {
+		int opcode = *ptr++;
+		int opsize;
+
+		switch (opcode) {
+		case TCPOPT_EOL:
+			return mss;
+		case TCPOPT_NOP:	/* Ref: RFC 793 section 3.1 */
+			length--;
+			continue;
+		default:
+			if (length < 2)
+				return mss;
+			opsize = *ptr++;
+			if (opsize < 2) /* "silly options" */
+				return mss;
+			if (opsize > length)
+				return mss;	/* fail on partial options */
+			if (opcode == TCPOPT_MSS && opsize == TCPOLEN_MSS) {
+//				uint16_t in_mss = get_unaligned_be16(ptr);
+                uint16_t in_mss = bpf_ntohs(*(uint16_t *)ptr);
+
+				if (in_mss) {
+					if (user_mss && user_mss < in_mss)
+						in_mss = user_mss;
+					mss = in_mss;
+				}
+			}
+			ptr += opsize - 2;
+			length -= opsize;
+		}
+	}
+	return mss;
+}
+
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
     __uint(max_entries, 512 * 1024); // 512 KB
@@ -33,6 +80,7 @@ struct packet_t {
     bool syn;
     bool ack;
     uint64_t ts;
+    uint16_t mss; // New field for storing the TCP MSS
 };
 
 static inline int handle_ip_packet(void* head, void* tail, uint32_t* offset, struct packet_t* pkt) {
@@ -128,6 +176,27 @@ static inline int handle_ip_segment(void* head, void* tail, uint32_t* offset, st
     }
 }
 
+static inline int try_handle_ip_option(void* head, void* tail, uint32_t* offset, struct packet_t* pkt) {
+    // only handle TCP packets
+    if (pkt->protocol != IPPROTO_TCP) {
+        return 0;
+    }
+
+    // only handle SYN / SYN.ACK packets
+    if (pkt->syn == 0) {
+        return 0;
+    }
+
+    struct tcphdr* tcp;
+    tcp = head + *offset;
+    if (!(tcp->doff > (sizeof(struct tcphdr)>>2))) {
+        return 0;
+    }
+
+    pkt->mss = tcp_parse_mss_option(tcp, 0);
+    return 1;
+}
+
 SEC("tc")
 int flat(struct __sk_buff* skb) {
 
@@ -170,6 +239,8 @@ int flat(struct __sk_buff* skb) {
         bpf_ringbuf_discard(pkt, 0);
         return TC_ACT_OK;
     }
+
+    try_handle_ip_option(head, tail, &offset, pkt);
 
     bpf_ringbuf_submit(pkt, 0);
 
