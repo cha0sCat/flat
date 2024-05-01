@@ -30,42 +30,42 @@ uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss, void* 
 	int length = (th->doff * 4) - sizeof(struct tcphdr);
 	uint16_t mss = 0;
 
-	while (length > 0) {
-		int opcode = *ptr++;
-		int opsize;
-
-		if (opcode > tail || ptr > tail) {
-		    return mss;
-        }
-
-		switch (opcode) {
-		case TCPOPT_EOL:
-			return mss;
-		case TCPOPT_NOP:	/* Ref: RFC 793 section 3.1 */
-			length--;
-			continue;
-		default:
-			if (length < 2)
-				return mss;
-			opsize = *ptr++;
-			if (opsize < 2) /* "silly options" */
-				return mss;
-			if (opsize > length)
-				return mss;	/* fail on partial options */
-			if (opcode == TCPOPT_MSS && opsize == TCPOLEN_MSS) {
-//				uint16_t in_mss = get_unaligned_be16(ptr);
-//                uint16_t in_mss = bpf_ntohs(*(uint16_t *)ptr);
-
-//				if (in_mss) {
-//					if (user_mss && user_mss < in_mss)
-//						in_mss = user_mss;
-//					mss = in_mss;
-//				}
-			}
-			ptr += opsize - 2;
-			length -= opsize;
-		}
-	}
+//	while (length > 0) {
+//		int opcode = *ptr++;
+//		int opsize;
+//
+//		if (opcode > tail || ptr > tail) {
+//		    return mss;
+//        }
+//
+//		switch (opcode) {
+//		case TCPOPT_EOL:
+//			return mss;
+//		case TCPOPT_NOP:	/* Ref: RFC 793 section 3.1 */
+//			length--;
+//			continue;
+//		default:
+//			if (length < 2)
+//				return mss;
+//			opsize = *ptr++;
+//			if (opsize < 2) /* "silly options" */
+//				return mss;
+//			if (opsize > length)
+//				return mss;	/* fail on partial options */
+//			if (opcode == TCPOPT_MSS && opsize == TCPOLEN_MSS) {
+////				uint16_t in_mss = get_unaligned_be16(ptr);
+////                uint16_t in_mss = bpf_ntohs(*(uint16_t *)ptr);
+//
+////				if (in_mss) {
+////					if (user_mss && user_mss < in_mss)
+////						in_mss = user_mss;
+////					mss = in_mss;
+////				}
+//			}
+//			ptr += opsize - 2;
+//			length -= opsize;
+//		}
+//	}
 	return mss;
 }
 
