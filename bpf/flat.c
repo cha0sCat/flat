@@ -56,11 +56,11 @@ uint16_t tcp_parse_mss_option(const struct tcphdr *th, uint16_t user_mss, void* 
 //				uint16_t in_mss = get_unaligned_be16(ptr);
 //                uint16_t in_mss = bpf_ntohs(*(uint16_t *)ptr);
 
-				if (in_mss) {
-					if (user_mss && user_mss < in_mss)
-						in_mss = user_mss;
-					mss = in_mss;
-				}
+//				if (in_mss) {
+//					if (user_mss && user_mss < in_mss)
+//						in_mss = user_mss;
+//					mss = in_mss;
+//				}
 			}
 			ptr += opsize - 2;
 			length -= opsize;
